@@ -1,5 +1,7 @@
 import jwt from 'jsonwebtoken';
 import User from '../models/user.model.js';
+import mongoose from 'mongoose';
+
 export const protectRoute = async (req, res, next) => {
     try {
         // Check token from cookies or Authorization header
@@ -27,11 +29,32 @@ export const protectRoute = async (req, res, next) => {
             console.log("Token verification failed");
             return res.status(401).json({ message: "Unauthorized - Invalid token" });
         }
-        const user = await User.findById(decoded._id).select("-password");
+        
+        // Convert decoded ID to string if it's a MongoDB ObjectId
+        const decodedId = decoded._id?.toString() || decoded.id?.toString();
+        
+        // Find user with consistent ID handling
+        const user = await User.findById(decodedId).select("-password");
+        
         if (!user) {
-            return res.status(401).json({ message: "Unauthorized" });
+            return res.status(401).json({ message: "Unauthorized - User not found" });
         }
+        
+        // Set user on request object
         req.user = user;
+        
+        // IMPORTANT: Ensure consistent ID format
+        // Always set req.user.id as a string representation
+        if (user._id) {
+            req.user.id = user._id.toString();
+        }
+        
+        console.log("Authenticated user:", { 
+            id: req.user.id, 
+            _id: req.user._id?.toString(),
+            role: req.user.role
+        });
+        
         next();
     } catch (error) {
         console.log("Error in auth middleware:", error.message || error);
