@@ -24,16 +24,16 @@ app.use(express.json({ limit: '10mb' })); // or higher, e.g. '20mb'
 
 
 // --- BEGIN: Improved allowedOrigins and CORS logic ---
-const allowedOrigins = process.env.NODE_ENV === 'production' 
-  ? [process.env.FRONTEND_URL || 'https://boneandbone.netlify.app']
+const allowedOrigins = process.env.NODE_ENV === 'production'
+  ? [process.env.FRONTEND_URL || 'https://wolverine-house.netlify.app']
   : [
-      'http://localhost:5173', 
-      'http://localhost:3000', 
-      'http://192.168.18.118:5173'
-    ];
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://192.168.18.118:5173'
+  ];
 
 app.use(cors({
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     console.log('Request origin:', origin); // Debug log
     if (!origin) return callback(null, true);
     if (process.env.NODE_ENV !== 'production') {
@@ -61,7 +61,7 @@ const PORT = process.env.PORT || 5001;
 
 // Add a test route for health check
 app.get('/', (req, res) => {
-  res.json({ 
+  res.json({
     message: 'Backend is working now!',
     environment: process.env.NODE_ENV,
     timestamp: new Date().toISOString()
@@ -110,7 +110,7 @@ const onlineUsers = new Map();
 
 io.on('connection', (socket) => {
   console.log(`User connected: ${socket.user.id}`);
-  
+
   // Add user to online users
   onlineUsers.set(socket.user.id, socket.id);
   socket.join(socket.user.id);
