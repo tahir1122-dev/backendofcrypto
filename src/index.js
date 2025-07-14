@@ -24,38 +24,68 @@ app.use(express.json({ limit: '10mb' })); // or higher, e.g. '20mb'
 
 
 // --- BEGIN: Improved allowedOrigins and CORS logic ---
-const allowedOrigins = process.env.NODE_ENV === 'production'
-  ? [process.env.FRONTEND_URL || 'https://wolverine-house.netlify.app']
-  : [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://192.168.18.118:5173'
-  ];
+const allowedOrigins = [
+  'https://wolverine-house.netlify.app',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:3000',
+  'http://192.168.18.118:5173'
+];
+
+// Add any custom frontend URL from environment
+if (process.env.FRONTEND_URL) {
+  allowedOrigins.push(process.env.FRONTEND_URL);
+}
 
 app.use(cors({
   origin: function (origin, callback) {
-    console.log('Request origin:', origin); // Debug log
+    console.log('🔍 Request origin:', origin); // Debug log
+    
+    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
+    
+    // Allow all localhost and 127.0.0.1 requests in development
     if (process.env.NODE_ENV !== 'production') {
-      if (origin.startsWith('http://192.168.18.118')) {
-        return callback(null, true);
-      }
-      if (origin.includes('localhost') || origin.includes('127.0.0.1')) {
+      if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.startsWith('http://192.168.')) {
+        console.log('✅ Local development origin allowed:', origin);
         return callback(null, true);
       }
     }
+    
+    // Check if origin is in allowed list
     if (allowedOrigins.includes(origin)) {
+      console.log('✅ Origin allowed:', origin);
       return callback(null, true);
     }
-    console.log(`Origin ${origin} not allowed by CORS`);
+    
+    // Allow any netlify.app domain
+    if (origin.includes('.netlify.app')) {
+      console.log('✅ Netlify domain allowed:', origin);
+      return callback(null, true);
+    }
+    
+    console.log('❌ Origin not allowed by CORS:', origin);
+    console.log('🔧 Allowed origins:', allowedOrigins);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
-  optionsSuccessStatus: 200
+  allowedHeaders: ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
+  optionsSuccessStatus: 200,
+  preflightContinue: false
 }));
 // --- END: Improved allowedOrigins and CORS logic ---
+
+// Handle preflight requests explicitly
+app.options('*', (req, res) => {
+  console.log('🔄 Preflight request from:', req.headers.origin);
+  res.header('Access-Control-Allow-Origin', req.headers.origin);
+  res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,PATCH,OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Accept, X-Requested-With');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.sendStatus(200);
+});
 
 const PORT = process.env.PORT || 5001;
 
@@ -71,7 +101,7 @@ app.get('/', (req, res) => {
 
 // API Routes
 app.use('/api/users', userRoutes);
-app.use('/api/product', productRoutes);
+app.use('/api/products', productRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/orders', orderRoutes); // Add this line
@@ -82,7 +112,27 @@ const server = createServer(app);
 // Create Socket.io server
 const io = new Server(server, {
   cors: {
-    origin: ['http://localhost:5173', 'http://localhost:3000'],
+    origin: function (origin, callback) {
+      // Allow requests with no origin
+      if (!origin) return callback(null, true);
+      
+      // Allow localhost and development origins
+      if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.startsWith('http://192.168.')) {
+        return callback(null, true);
+      }
+      
+      // Allow netlify domains
+      if (origin.includes('.netlify.app')) {
+        return callback(null, true);
+      }
+      
+      // Allow specific origins
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      
+      return callback(new Error('Not allowed by CORS'));
+    },
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true
