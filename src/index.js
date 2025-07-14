@@ -41,10 +41,10 @@ if (process.env.FRONTEND_URL) {
 app.use(cors({
   origin: function (origin, callback) {
     console.log('🔍 Request origin:', origin); // Debug log
-    
+
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     // Allow all localhost and 127.0.0.1 requests in development
     if (process.env.NODE_ENV !== 'production') {
       if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.startsWith('http://192.168.')) {
@@ -52,19 +52,19 @@ app.use(cors({
         return callback(null, true);
       }
     }
-    
+
     // Check if origin is in allowed list
     if (allowedOrigins.includes(origin)) {
       console.log('✅ Origin allowed:', origin);
       return callback(null, true);
     }
-    
+
     // Allow any netlify.app domain
     if (origin.includes('.netlify.app')) {
       console.log('✅ Netlify domain allowed:', origin);
       return callback(null, true);
     }
-    
+
     console.log('❌ Origin not allowed by CORS:', origin);
     console.log('🔧 Allowed origins:', allowedOrigins);
     return callback(new Error('Not allowed by CORS'));
@@ -115,22 +115,22 @@ const io = new Server(server, {
     origin: function (origin, callback) {
       // Allow requests with no origin
       if (!origin) return callback(null, true);
-      
+
       // Allow localhost and development origins
       if (origin.includes('localhost') || origin.includes('127.0.0.1') || origin.startsWith('http://192.168.')) {
         return callback(null, true);
       }
-      
+
       // Allow netlify domains
       if (origin.includes('.netlify.app')) {
         return callback(null, true);
       }
-      
+
       // Allow specific origins
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
-      
+
       return callback(new Error('Not allowed by CORS'));
     },
     methods: ['GET', 'POST'],
