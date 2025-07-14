@@ -24,7 +24,7 @@ app.use(express.json({ limit: '10mb' })); // or higher, e.g. '20mb'
 
 // --- BEGIN: Improved allowedOrigins and CORS logic ---
 const allowedOrigins = process.env.NODE_ENV === 'production'
-  ? [process.env.FRONTEND_URL || 'https://boneandbone.netlify.app']
+  ? [process.env.FRONTEND_URL || 'https://wolverine-house.netlify.app']
   : [
     'http://localhost:5173',
     'http://localhost:3000',
