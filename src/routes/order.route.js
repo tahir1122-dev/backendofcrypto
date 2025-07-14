@@ -19,8 +19,12 @@ router.use(protectRoute);
 // Order CRUD operations
 router.post('/', createOrder);                    // Create order (Admin only)
 router.get('/', getOrders);                       // Get orders (Admin: all, Seller: own)
+
+// Stats routes MUST come before parameterized routes
 router.get('/stats', getOrderStats);              // Get order statistics
-router.get('/stats/:sellerId', getOrderStats);    // Get order statistics for specific seller (Admin only)
+router.get('/stats/seller/:sellerId', getOrderStats);    // Get order statistics for specific seller (Admin only)
+
+// Parameterized routes come after specific routes
 router.get('/:id', getOrderById);                 // Get single order
 router.put('/:id', updateOrder);                  // Update order (Admin only)
 router.delete('/:id', deleteOrder);               // Delete order (Admin only)
