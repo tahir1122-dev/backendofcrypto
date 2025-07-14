@@ -71,7 +71,7 @@ app.get('/', (req, res) => {
 
 // API Routes
 app.use('/api/users', userRoutes);
-app.use('/api/products', productRoutes);
+app.use('/api/product', productRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/orders', orderRoutes); // Add this line
