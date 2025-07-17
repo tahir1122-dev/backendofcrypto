@@ -81,12 +81,15 @@ export const login = async (req, res) => {
       _id: user._id,
       name: user.name,
       email: user.email,
+      phone: user.phone,
       shopName: user.shopName,
+      identity: user.identity,
       creditAmount: user.creditAmount,
       totalOrders: user.totalOrders,
       pendingAmount: user.pendingAmount,
       role: user.role,
       approved: user.approved,
+      createdAt: user.createdAt,
       token
     });
   } catch (error) {

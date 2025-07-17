@@ -1,6 +1,7 @@
 import Order from '../models/order.model.js';
 import User from '../models/user.model.js';
 import Product from '../models/product.model.js';
+import SellerProduct from '../models/sellerProduct.model.js';
 import mongoose from 'mongoose';
 
 // Create new order (Admin only)
@@ -52,22 +53,44 @@ export const createOrder = async (req, res) => {
     for (const item of items) {
       console.log('Processing item:', item);
       
-      const product = await Product.findById(item.productId);
-      if (!product) {
-        console.log('Product not found:', item.productId);
-        return res.status(400).json({ message: `Product ${item.productId} not found` });
+      // Find the seller product instead of just the product
+      const sellerProduct = await SellerProduct.findById(item.productId).populate('product');
+      if (!sellerProduct) {
+        console.log('Seller product not found:', item.productId);
+        return res.status(400).json({ message: `Seller product ${item.productId} not found` });
       }
 
-      console.log('Product found:', { 
-        id: product._id, 
-        name: product.name, 
-        price: product.price, 
-        discountedPrice: product.discountedPrice 
+      // Validate that this seller product belongs to the selected seller
+      if (sellerProduct.seller.toString() !== sellerId.toString()) {
+        console.log('Seller product does not belong to selected seller:', {
+          sellerProductSeller: sellerProduct.seller.toString(),
+          selectedSeller: sellerId.toString()
+        });
+        return res.status(400).json({ message: `Product does not belong to selected seller` });
+      }
+
+      // Check if seller has enough quantity
+      if (sellerProduct.sellerQuantity < item.quantity) {
+        console.log('Insufficient quantity:', {
+          available: sellerProduct.sellerQuantity,
+          requested: item.quantity
+        });
+        return res.status(400).json({ 
+          message: `Insufficient quantity for ${sellerProduct.product.name}. Available: ${sellerProduct.sellerQuantity}, Requested: ${item.quantity}` 
+        });
+      }
+
+      console.log('Seller product found:', { 
+        id: sellerProduct._id, 
+        productName: sellerProduct.product.name, 
+        sellerPrice: sellerProduct.sellerPrice, 
+        sellerDiscountedPrice: sellerProduct.sellerDiscountedPrice,
+        sellerQuantity: sellerProduct.sellerQuantity
       });
 
       const quantity = item.quantity || 1;
-      const originalPrice = product.price; // Use 'price' as originalPrice
-      const discountedPrice = product.discountedPrice || product.price; // Use price as fallback
+      const originalPrice = sellerProduct.sellerPrice;
+      const discountedPrice = sellerProduct.sellerDiscountedPrice || sellerProduct.sellerPrice;
       const itemTotal = discountedPrice * quantity;
       const itemProfit = (originalPrice - discountedPrice) * quantity;
 
@@ -80,7 +103,7 @@ export const createOrder = async (req, res) => {
       });
 
       processedItems.push({
-        product: product._id,
+        product: sellerProduct.product._id,
         quantity,
         originalPrice,
         discountedPrice,
@@ -90,6 +113,10 @@ export const createOrder = async (req, res) => {
 
       totalAmount += itemTotal;
       totalProfit += itemProfit;
+
+      // Update seller product quantity
+      sellerProduct.sellerQuantity -= quantity;
+      await sellerProduct.save();
     }
 
     // Generate order number
