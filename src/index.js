@@ -12,6 +12,8 @@ import authRoutes from './routes/auth.route.js';
 import chatRoutes from './routes/chat.route.js';
 import orderRoutes from './routes/order.route.js';
 import sellerProductRoutes from './routes/sellerProduct.route.js';
+import faqRoutes from './routes/faq.route.js';
+import depositRoutes from './routes/deposit.route.js';
 import { connectDB } from './lib/db.js';
 import { createAdmin } from './controllers/user.controller.js';
 
@@ -47,6 +49,8 @@ app.use('/api/auth', authRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/seller-products', sellerProductRoutes); // Seller product routes
+app.use('/api/faqs', faqRoutes); // FAQ routes
+app.use('/api/deposits', depositRoutes); // Deposit routes
 
 // Create HTTP server
 const server = createServer(app);
@@ -86,26 +90,48 @@ io.use((socket, next) => {
 const onlineUsers = new Map();
 
 io.on('connection', (socket) => {
-  console.log(`User connected: ${socket.user.id}`);
+  console.log(`🔌 User connected: ${socket.user.id} with socket ID: ${socket.id}`);
   
   // Add user to online users
   onlineUsers.set(socket.user.id, socket.id);
   socket.join(socket.user.id);
+  
+  console.log(`👥 Online users count: ${onlineUsers.size}`);
+  console.log(`📋 Online users:`, Array.from(onlineUsers.keys()));
 
-  // Handle new messages
-  socket.on('send_message', ({ conversationId, recipientId, content }) => {
+  // Handle new messages (real-time only, not DB save)
+  socket.on('send_message', async ({ conversationId, recipientId, content, imageUrl, _id, senderId, createdAt, sender }) => {
+    // This event is now only for real-time delivery, not DB save
+    // The actual DB save and socket emit is handled in the REST API (chat.controller.js)
+    // This handler is kept for backward compatibility or extra real-time needs
+    const messageData = {
+      conversationId,
+      senderId,
+      content,
+      imageUrl,
+      _id,
+      createdAt,
+      sender
+    };
     if (onlineUsers.has(recipientId)) {
-      io.to(recipientId).emit('new_message', {
-        conversationId,
-        senderId: socket.user.id,
-        content,
-        createdAt: new Date()
-      });
+      io.to(recipientId).emit('new_message', messageData);
     }
+    socket.emit('message_sent', messageData);
+  });
+
+  // Handle test messages
+  socket.on('test_message', (data) => {
+    console.log(`🧪 TEST: Received test message from ${socket.user.id}:`, data);
+    socket.emit('test_response', { 
+      message: 'Test received successfully', 
+      timestamp: new Date().toISOString(),
+      userId: socket.user.id
+    });
   });
 
   // Handle typing
   socket.on('typing', ({ conversationId, recipientId }) => {
+    console.log(`⌨️ TYPING: ${socket.user.id} is typing to ${recipientId}`);
     if (onlineUsers.has(recipientId)) {
       io.to(recipientId).emit('typing', {
         conversationId,
@@ -115,6 +141,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('stop_typing', ({ conversationId, recipientId }) => {
+    console.log(`⏹️ STOP_TYPING: ${socket.user.id} stopped typing to ${recipientId}`);
     if (onlineUsers.has(recipientId)) {
       io.to(recipientId).emit('stop_typing', {
         conversationId,
@@ -125,10 +152,15 @@ io.on('connection', (socket) => {
 
   // Handle disconnection
   socket.on('disconnect', () => {
-    console.log(`User disconnected: ${socket.user.id}`);
+    console.log(`🔌 User disconnected: ${socket.user.id}`);
     onlineUsers.delete(socket.user.id);
+    console.log(`👥 Remaining online users: ${onlineUsers.size}`);
   });
 });
+
+// Make io instance and online users available to routes
+app.set('io', io);
+app.set('onlineUsers', onlineUsers);
 
 // Database initialization with fallback
 const initializeApp = async () => {

@@ -61,3 +61,25 @@ export const protectRoute = async (req, res, next) => {
         return res.status(500).json({ message: "Internal Server Error" });
     }
 }
+
+// Alias for consistency with other route files
+export const protect = protectRoute;
+
+// Role-based authorization middleware
+export const authorize = (...roles) => {
+    return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ 
+                message: 'Access denied. Please authenticate first.' 
+            });
+        }
+
+        if (!roles.includes(req.user.role)) {
+            return res.status(403).json({ 
+                message: `Access denied. Required role: ${roles.join(' or ')}. Your role: ${req.user.role}` 
+            });
+        }
+
+        next();
+    };
+};

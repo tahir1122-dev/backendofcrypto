@@ -4,6 +4,7 @@ import User from '../models/user.model.js';
 import mongoose from 'mongoose';
 import { safeCreateConversation } from '../lib/conversationHelper.js';
 import { createConversation as createConversationImpl } from './create-conversation.js';
+import cloudinary from '../lib/cloudinary.js';
 
 // Get or create a conversation between current user and another user
 export const getOrCreateConversation = async (req, res) => {
@@ -405,7 +406,7 @@ export const getMessages = async (req, res) => {
 export const sendMessage = async (req, res) => {
   try {
     const { conversationId } = req.params;
-    const { content } = req.body;
+    const { content, imageBase64 } = req.body;
     const senderId = req.user.id || (req.user._id ? req.user._id.toString() : null);
 
     console.log(`sendMessage: conversationId=${conversationId}, sender=${senderId}`);
@@ -417,8 +418,8 @@ export const sendMessage = async (req, res) => {
       role: req.user.role
     });
 
-    if (!content || content.trim() === '') {
-      return res.status(400).json({ message: 'Message content cannot be empty' });
+    if ((!content || content.trim() === '') && !imageBase64) {
+      return res.status(400).json({ message: 'Message content or image is required' });
     }
     
     // Handle temp IDs from frontend
@@ -520,12 +521,29 @@ export const sendMessage = async (req, res) => {
     }
 
     console.log(`Sending message from ${senderId} to ${recipientId}`);
-    
+
+    // If imageBase64 is present, upload to Cloudinary
+    let imageUrl = null;
+    if (imageBase64) {
+      try {
+        const uploadRes = await cloudinary.uploader.upload(imageBase64, {
+          folder: 'chat_images',
+          resource_type: 'image',
+        });
+        imageUrl = uploadRes.secure_url;
+        console.log('Image uploaded to Cloudinary:', imageUrl);
+      } catch (err) {
+        console.error('Cloudinary upload failed:', err);
+        return res.status(500).json({ message: 'Image upload failed', error: err.message });
+      }
+    }
+
     // Create and save message
     const newMessage = new Message({
       sender: senderId,
       recipient: recipientId,
-      content: content.trim(),
+      content: content ? content.trim() : '',
+      imageUrl: imageUrl || null,
     });
 
     const savedMessage = await newMessage.save();
@@ -543,6 +561,45 @@ export const sendMessage = async (req, res) => {
       path: 'sender',
       select: 'name role profile'
     });
+
+    console.log('Message saved and populated:', populatedMessage._id);
+
+    // Emit socket event for real-time updates
+    const io = req.app.get('io'); // Get socket.io instance from app
+    if (io) {
+      const messageData = {
+        _id: populatedMessage._id.toString(),
+        conversationId: conversationId,
+        senderId: senderId.toString(),
+        recipientId: recipientId.toString(),
+        content: populatedMessage.content,
+        imageUrl: populatedMessage.imageUrl,
+        createdAt: populatedMessage.createdAt.toISOString(),
+        sender: {
+          _id: populatedMessage.sender._id.toString(),
+          name: populatedMessage.sender.name,
+          role: populatedMessage.sender.role,
+          profile: populatedMessage.sender.profile
+        }
+      };
+
+      console.log('Emitting socket event for new message:', {
+        messageId: messageData._id,
+        from: messageData.senderId,
+        to: messageData.recipientId,
+        conversationId: messageData.conversationId
+      });
+      
+      // Emit to recipient
+      io.to(recipientId.toString()).emit('new_message', messageData);
+      
+      // Also emit to sender for confirmation
+      io.to(senderId.toString()).emit('message_sent', messageData);
+      
+      console.log(`Socket events emitted to ${recipientId} and ${senderId}`);
+    } else {
+      console.error('Socket.io instance not available in chat controller');
+    }
 
     res.status(201).json(populatedMessage);
   } catch (error) {

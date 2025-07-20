@@ -42,18 +42,23 @@ export default function setupSocket(server) {
       console.log(`SOCKET: Message from ${socket.user?.id} to ${recipientId}: "${content}"`);
       console.log(`SOCKET: Recipient socket ID: ${onlineUsers.get(recipientId) || 'offline'}`);
       
+      const messageData = {
+        conversationId,
+        senderId: socket.user?.id,
+        content,
+        createdAt: new Date().toISOString()
+      };
+      
       // Emit to recipient if online
       if (onlineUsers.has(recipientId)) {
         console.log(`SOCKET: Emitting message to recipient ${recipientId}`);
-        io.to(recipientId).emit('new_message', {
-          conversationId,
-          senderId: socket.user?.id,
-          content,
-          createdAt: new Date().toISOString()
-        });
+        io.to(recipientId).emit('new_message', messageData);
       } else {
         console.log(`SOCKET: Recipient ${recipientId} is offline`);
       }
+
+      // Also emit to sender for confirmation (optional)
+      socket.emit('message_sent', messageData);
     });
 
     // Handle typing indicator
