@@ -13,7 +13,10 @@ import { protect, authorize } from '../middleware/auth.middleware.js';
 const router = express.Router();
 
 // Public route for sellers to view deposits
-router.get('/active', getActiveDeposits);
+import { protectRoute } from '../middleware/auth.middleware.js';
+
+// Require authentication for /active so seller filtering works
+router.get('/active', protectRoute, getActiveDeposits);
 
 // Protected routes (admin only)
 router.use(protect);

@@ -29,32 +29,26 @@ export const protectRoute = async (req, res, next) => {
             console.log("Token verification failed");
             return res.status(401).json({ message: "Unauthorized - Invalid token" });
         }
-        
+        // Debug: log decoded token
+        console.log('protectRoute: decoded token:', decoded);
         // Convert decoded ID to string if it's a MongoDB ObjectId
         const decodedId = decoded._id?.toString() || decoded.id?.toString();
-        
         // Find user with consistent ID handling
         const user = await User.findById(decodedId).select("-password");
-        
+        // Debug: log found user
+        console.log('protectRoute: found user:', user);
         if (!user) {
             return res.status(401).json({ message: "Unauthorized - User not found" });
         }
-        
         // Set user on request object
         req.user = user;
-        
         // IMPORTANT: Ensure consistent ID format
         // Always set req.user.id as a string representation
         if (user._id) {
             req.user.id = user._id.toString();
         }
-        
-        console.log("Authenticated user:", { 
-            id: req.user.id, 
-            _id: req.user._id?.toString(),
-            role: req.user.role
-        });
-        
+        // Debug: log req.user
+        console.log('protectRoute: req.user:', req.user);
         next();
     } catch (error) {
         console.log("Error in auth middleware:", error.message || error);

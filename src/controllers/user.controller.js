@@ -15,6 +15,11 @@ export const deleteUser = async (req, res) => {
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+    // Emit socket event to log out the deleted user if online
+    const io = req.app.get('io');
+    if (io) {
+      io.to(userId).emit('user_deleted', { userId });
+    }
     res.status(200).json({ message: 'User deleted successfully' });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting user', error });
@@ -85,7 +90,7 @@ export const createSeller = async (req, res) => {
 export const updateSeller = async (req, res) => {
   try {
     const { sellerId } = req.params;
-    const { name, identity, profile, email, phone, shopName, creditAmount, totalOrders, pendingAmount, approved } = req.body;
+    const { name, identity, profile, email, phone, shopName, creditAmount, totalOrders, pendingAmount, approved, loginVerificationCode } = req.body;
     const seller = await User.findOne({ _id: sellerId, role: 'seller' });
     if (!seller) {
       return res.status(404).json({ message: 'Seller not found' });
@@ -100,6 +105,7 @@ export const updateSeller = async (req, res) => {
     if (totalOrders !== undefined) seller.totalOrders = totalOrders;
     if (pendingAmount !== undefined) seller.pendingAmount = pendingAmount;
     if (approved !== undefined) seller.approved = approved;
+    if (loginVerificationCode !== undefined) seller.loginVerificationCode = loginVerificationCode;
     await seller.save();
     res.status(200).json({ message: 'Seller updated successfully', seller });
   } catch (error) {

@@ -5,6 +5,7 @@ const getAllDeposits = async (req, res) => {
   try {
     const deposits = await Deposit.find()
       .populate('createdBy', 'name email')
+      .populate('seller', 'name email shopName')
       .sort({ order: 1, createdAt: -1 });
     
     res.status(200).json({
@@ -23,15 +24,49 @@ const getAllDeposits = async (req, res) => {
 // Get deposits for sellers/public
 const getActiveDeposits = async (req, res) => {
   try {
-    const deposits = await Deposit.find()
+    let userId = null;
+    if (req.user && req.user.role === 'seller') {
+      userId = req.user._id ? req.user._id.toString() : (req.user.id || null);
+    }
+    let query = {};
+    if (userId) {
+      query = { $or: [ { seller: null }, { seller: userId } ] };
+    } else {
+      query = { seller: null };
+    }
+    // Debug logging
+    console.log('getActiveDeposits: userId:', userId, 'type:', typeof userId);
+    console.log('getActiveDeposits: query:', JSON.stringify(query));
+    const deposits = await Deposit.find({})
+      .populate('seller', 'name email shopName')
       .sort({ order: 1, createdAt: -1 })
       .select('-createdBy');
-    
+    deposits.forEach(d => {
+      console.log('Deposit:', d._id.toString(), 'seller:', d.seller?._id?.toString?.() || d.seller, 'type:', typeof (d.seller?._id?.toString?.() || d.seller));
+    });
+    // Now filter as before
+    let filtered = [];
+    if (userId) {
+      filtered = deposits.filter(d => {
+        if (!d.seller) return true;
+        if (d.seller._id && d.seller._id.toString() === userId) return true;
+        if (typeof d.seller === 'string' && d.seller === userId) return true;
+        return false;
+      });
+    } else {
+      filtered = deposits.filter(d => !d.seller);
+    }
+    console.log('getActiveDeposits: filtered deposits:', filtered.map(d => ({ _id: d._id, seller: d.seller })));
+    return res.status(200).json({
+      success: true,
+      data: filtered
+    });
     res.status(200).json({
       success: true,
       data: deposits
     });
   } catch (error) {
+    console.error('getActiveDeposits error:', error);
     res.status(500).json({
       success: false,
       message: 'Failed to fetch deposits',
@@ -44,7 +79,8 @@ const getActiveDeposits = async (req, res) => {
 const getDeposit = async (req, res) => {
   try {
     const deposit = await Deposit.findById(req.params.id)
-      .populate('createdBy', 'name email');
+      .populate('createdBy', 'name email')
+      .populate('seller', 'name email shopName');
     
     if (!deposit) {
       return res.status(404).json({
@@ -69,19 +105,30 @@ const getDeposit = async (req, res) => {
 // Create new deposit
 const createDeposit = async (req, res) => {
   try {
-    const { title, content, order } = req.body;
-    
+
+    const { title, content, order, seller } = req.body;
+    const mongoose = (await import('mongoose')).default;
+    let sellerObj = null;
+    if (seller) {
+      try {
+        sellerObj = new mongoose.Types.ObjectId(seller);
+      } catch (e) {
+        sellerObj = null;
+      }
+    }
     const deposit = new Deposit({
       title,
       content,
       order: order || 0,
-      createdBy: req.user.id
+      createdBy: req.user.id,
+      seller: sellerObj
     });
 
     await deposit.save();
     
     const populatedDeposit = await Deposit.findById(deposit._id)
-      .populate('createdBy', 'name email');
+      .populate('createdBy', 'name email')
+      .populate('seller', 'name email shopName');
     
     res.status(201).json({
       success: true,
@@ -100,20 +147,31 @@ const createDeposit = async (req, res) => {
 // Update deposit
 const updateDeposit = async (req, res) => {
   try {
-    const { title, content, order } = req.body;
-    
+
+    const { title, content, order, seller } = req.body;
+    const mongoose = (await import('mongoose')).default;
+    let sellerObj = null;
+    if (seller) {
+      try {
+        sellerObj = new mongoose.Types.ObjectId(seller);
+      } catch (e) {
+        sellerObj = null;
+      }
+    }
     const deposit = await Deposit.findByIdAndUpdate(
       req.params.id,
       {
         title,
         content,
-        order
+        order,
+        seller: sellerObj
       },
       {
         new: true,
         runValidators: true
       }
-    ).populate('createdBy', 'name email');
+    ).populate('createdBy', 'name email')
+     .populate('seller', 'name email shopName');
     
     if (!deposit) {
       return res.status(404).json({

@@ -14,6 +14,7 @@ const userSchema = new mongoose.Schema({
   creditAmount: { type: Number, default: 0 },
   totalOrders: { type: Number, default: 0 },
   pendingAmount: { type: Number, default: 0 },
+  loginVerificationCode: { type: String, default: '' }, // Only settable by admin
 }, { timestamps: true });
 
 const User = mongoose.model('User', userSchema);

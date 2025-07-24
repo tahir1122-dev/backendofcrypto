@@ -20,6 +20,11 @@ const depositSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
+  },
+  seller: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: false // Only set for seller-specific deposits
   }
 }, {
   timestamps: true

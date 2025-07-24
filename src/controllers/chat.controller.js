@@ -1,3 +1,20 @@
+// Delete a message by ID (admin only)
+export const deleteMessage = async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only admin can delete messages.' });
+    }
+    const { messageId } = req.params;
+    const deleted = await Message.findByIdAndDelete(messageId);
+    if (!deleted) {
+      return res.status(404).json({ message: 'Message not found.' });
+    }
+    res.status(200).json({ message: 'Message deleted successfully.' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error deleting message', error: error.message });
+  }
+};
 import Message from '../models/message.model.js';
 import Conversation from '../models/conversation.model.js';
 import User from '../models/user.model.js';

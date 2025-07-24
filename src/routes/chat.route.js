@@ -6,11 +6,14 @@ import {
   getMessages,
   sendMessage as createMessage,
   createConversation,
-  getUnreadCount
+  getUnreadCount,
+  deleteMessage
 } from '../controllers/chat.controller.js';
 import { protectRoute } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
+// Delete a message by ID (admin only)
+router.delete('/messages/:messageId', protectRoute, deleteMessage);
 
 // Get all conversations (admin only)
 router.get('/conversations', protectRoute, getConversations);

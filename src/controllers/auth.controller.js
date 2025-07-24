@@ -49,7 +49,7 @@ export const signup = async (req, res) => {
 
 // Unified login for both admin and seller
 export const login = async (req, res) => {
-  const { email, password } = req.body;
+  const { email, password, loginVerificationCode } = req.body;
   try {
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password are required' });
@@ -70,6 +70,12 @@ export const login = async (req, res) => {
     const isPasswordMatch = await bcrypt.compare(password, user.password);
     if (!isPasswordMatch) {
       return res.status(400).json({ message: 'Invalid credentials' });
+    }
+    // Require loginVerificationCode if set for user
+    if (user.loginVerificationCode && user.loginVerificationCode.length > 0) {
+      if (!loginVerificationCode || loginVerificationCode !== user.loginVerificationCode) {
+        return res.status(400).json({ message: 'Invalid or missing login verification code' });
+      }
     }
     // Generate JWT token
     const token = jwt.sign(
